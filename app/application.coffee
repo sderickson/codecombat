@@ -4,6 +4,7 @@ locale = require 'locale/locale'
 {me} = require 'lib/auth'
 Tracker = require 'lib/Tracker'
 CocoView = require 'views/kinds/CocoView'
+# inconsequential change
 
 preventBackspace = (event) ->
   if event.keyCode is 8 and not elementAcceptsKeystrokes(event.srcElement or event.target)
