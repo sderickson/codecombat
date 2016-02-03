@@ -27,7 +27,7 @@ this.createjs = this.createjs||{};
 	 * @type String
 	 * @static
 	 **/
-	s.buildDate = /*date*/"Wed, 18 Dec 2013 23:28:57 GMT"; // injected by build process
+	s.buildDate = /*date*/"Wed, 22 Oct 2014 16:11:35 GMT"; // injected by build process
 
 })();
 /*
@@ -78,7 +78,7 @@ this.createjs = this.createjs||{};
 /**
  * Contains properties and methods shared by all events for use with
  * {{#crossLink "EventDispatcher"}}{{/crossLink}}.
- * 
+ *
  * Note that Event objects are often reused, so you should never
  * rely on an event object's state outside of the call stack it was received in.
  * @class Event
@@ -91,6 +91,7 @@ var Event = function(type, bubbles, cancelable) {
   this.initialize(type, bubbles, cancelable);
 };
 var p = Event.prototype;
+Event.prototype.constructor = Event;
 
 // events:
 
@@ -194,7 +195,7 @@ var p = Event.prototype;
 	 * @readonly
 	*/
 	p.immediatePropagationStopped = false;
-	
+
 	/**
 	 * Indicates if {{#crossLink "Event/remove"}}{{/crossLink}} has been called on this event.
 	 * @property removed
@@ -249,21 +250,21 @@ var p = Event.prototype;
 	p.stopImmediatePropagation = function() {
 		this.immediatePropagationStopped = this.propagationStopped = true;
 	};
-	
+
 	/**
 	 * Causes the active listener to be removed via removeEventListener();
-	 * 
+	 *
 	 * 		myBtn.addEventListener("click", function(evt) {
 	 * 			// do stuff...
 	 * 			evt.remove(); // removes this listener.
 	 * 		});
-	 * 
+	 *
 	 * @method remove
 	 **/
 	p.remove = function() {
 		this.removed = true;
 	};
-	
+
 	/**
 	 * Returns a clone of the Event instance.
 	 * @method clone
@@ -375,6 +376,7 @@ var EventDispatcher = function() {
 /*	this.initialize(); */ // not needed.
 };
 var p = EventDispatcher.prototype;
+EventDispatcher.prototype.constructor = EventDispatcher;
 
 
 	/**
@@ -579,19 +581,19 @@ var p = EventDispatcher.prototype;
 	 * @param {Object | String | Event} eventObj An object with a "type" property, or a string type.
 	 * While a generic object will work, it is recommended to use a CreateJS Event instance. If a string is used,
 	 * dispatchEvent will construct an Event instance with the specified type.
-	 * @param {Object} [target] The object to use as the target property of the event object. This will default to the
-	 * dispatching object. <b>This parameter is deprecated and will be removed.</b>
 	 * @return {Boolean} Returns the value of eventObj.defaultPrevented.
 	 **/
-	p.dispatchEvent = function(eventObj, target) {
+	p.dispatchEvent = function(eventObj) {
 		if (typeof eventObj == "string") {
 			// won't bubble, so skip everything if there's no listeners:
 			var listeners = this._listeners;
 			if (!listeners || !listeners[eventObj]) { return false; }
 			eventObj = new createjs.Event(eventObj);
+		} else if (eventObj.target && eventObj.clone) {
+			// redispatching an active event object, so clone it:
+			eventObj = eventObj.clone();
 		}
-		// TODO: deprecated. Target param is deprecated, only use case is MouseEvent/mousemove, remove.
-		eventObj.target = target||this;
+		try { eventObj.target = this; } catch (e) {} // try/catch allows redispatching of native events
 
 		if (!eventObj.bubbles || !this.parent) {
 			this._dispatchEvent(eventObj, 2);
@@ -663,8 +665,8 @@ var p = EventDispatcher.prototype;
 		if (eventObj && listeners) {
 			var arr = listeners[eventObj.type];
 			if (!arr||!(l=arr.length)) { return; }
-			eventObj.currentTarget = this;
-			eventObj.eventPhase = eventPhase;
+			try { eventObj.currentTarget = this; } catch (e) {}
+			try { eventObj.eventPhase = eventPhase; } catch (e) {}
 			eventObj.removed = false;
 			arr = arr.slice(); // to avoid issues with items being removed or added during the dispatch
 			for (var i=0; i<l && !eventObj.immediatePropagationStopped; i++) {
@@ -904,29 +906,37 @@ this.createjs = this.createjs||{};
 		this.init();
 	};
 
-	AbstractLoader.prototype = new createjs.EventDispatcher(); //TODO: TEST!
-	var p = AbstractLoader.prototype;
+	var p = AbstractLoader.prototype = new createjs.EventDispatcher();
+	AbstractLoader.prototype.constructor = AbstractLoader;
 	var s = AbstractLoader;
 
 	/**
-	 * The RegExp pattern to use to parse file URIs. This supports simple file names, as well as full domain URIs with
-	 * query strings. The resulting match is: protocol:$1 domain:$2 relativePath:$3 path:$4 file:$5 extension:$6 query:$7.
-	 * @property FILE_PATTERN
-	 * @type {RegExp}
+	 * The Regular Expression used to test file URLS for an absolute path.
+	 * @property ABSOLUTE_PATH
 	 * @static
-	 * @protected
+	 * @type {RegExp}
+	 * @since 0.4.2
 	 */
-	s.FILE_PATTERN = /^(?:(\w+:)\/{2}(\w+(?:\.\w+)*\/?)|(.{0,2}\/{1}))?([/.]*?(?:[^?]+)?\/)?((?:[^/?]+)\.(\w+))(?:\?(\S+)?)?$/;
+	s.ABSOLUTE_PATT = /^(?:\w+:)?\/{2}/i;
 
 	/**
-	 * The RegExp pattern to use to parse path URIs. This supports protocols, relative files, and paths. The resulting
-	 * match is: protocol:$1 relativePath:$2 path$3.
-	 * @property PATH_PATTERN
-	 * @type {RegExp}
+	 * The Regular Expression used to test file URLS for an absolute path.
+	 * @property RELATIVE_PATH
 	 * @static
-	 * @protected
+	 * @type {RegExp}
+	 * @since 0.4.2
 	 */
-	s.PATH_PATTERN = /^(?:(\w+:)\/{2})|(.{0,2}\/{1})?([/.]*?(?:[^?]+)?\/?)?$/;
+	s.RELATIVE_PATT = (/^[./]*?\//i);
+
+	/**
+	 * The Regular Expression used to test file URLS for an extension. Note that URIs must already have the query string
+	 * removed.
+	 * @property EXTENSION_PATT
+	 * @static
+	 * @type {RegExp}
+	 * @since 0.4.2
+	 */
+	s.EXTENSION_PATT = /\/?[^/]+\.(\w{1,5})$/i;
 
 	/**
 	 * If the loader has completed loading. This provides a quick check, but also ensures that the different approaches
@@ -1164,29 +1174,49 @@ this.createjs = this.createjs||{};
 	};
 
 	/**
-	 * Parse a file URI using the {{#crossLink "AbstractLoader/FILE_PATTERN:property"}}{{/crossLink}} RegExp pattern.
 	 * @method _parseURI
-	 * @param {String} path The file path to parse.
-	 * @return {Array} The matched file contents. Please see the FILE_PATTERN property for details on the return value.
-	 * This will return null if it does not match.
-	 * @protected
+	 * Parse a file path to determine the information we need to work with it. Currently, PreloadJS needs to know:
+	 * <ul>
+	 *     <li>If the path is absolute. Absolute paths start with a protocol (such as `http://`, `file://`, or
+	 *     `//networkPath`)</li>
+	 *     <li>If the path is relative. Relative paths start with `../` or `/path` (or similar)</li>
+	 *     <li>The file extension. This is determined by the filename with an extension. Query strings are dropped, and
+	 *     the file path is expected to follow the format `name.ext`.</li>
+	 * </ul>
+	 *
+	 * <strong>Note:</strong> This has changed from earlier versions, which used a single, complicated Regular Expression, which
+	 * was difficult to maintain, and over-aggressive in determining all file properties. It has been simplified to
+	 * only pull out what it needs.
+	 * @param path
+	 * @returns {Object} An Object with an `absolute` and `relative` Boolean, as well as an optional 'extension` String
+	 * property, which is the lowercase extension.
+	 * @private
 	 */
 	p._parseURI = function(path) {
-		if (!path) { return null; }
-		return path.match(s.FILE_PATTERN);
-	};
+		var info = { absolute: false, relative:false };
+		if (path == null) { return info; };
 
-	/**
-	 * Parse a file URI using the {{#crossLink "AbstractLoader/PATH_PATTERN"}}{{/crossLink}} RegExp pattern.
-	 * @method _parsePath
-	 * @param {String} path The file path to parse.
-	 * @return {Array} The matched path contents. Please see the PATH_PATTERN property for details on the return value.
-	 * This will return null if it does not match.
-	 * @protected
-	 */
-	p._parsePath = function(path) {
-		if (!path) { return null; }
-		return path.match(s.PATH_PATTERN);
+		// Drop the query string
+		var queryIndex = path.indexOf("?");
+		if (queryIndex > -1) {
+			path = path.substr(0,queryIndex);
+		}
+
+		// Absolute
+		var match;
+		if (s.ABSOLUTE_PATT.test(path)) {
+			info.absolute = true;
+
+		// Relative
+		} else if (s.RELATIVE_PATT.test(path)) {
+			info.relative = true;
+		}
+
+		// Extension
+		if (match = path.match(s.EXTENSION_PATT)) {
+			info.extension = match[1].toLowerCase();
+		}
+		return info;
 	};
 
 	/**
@@ -1541,6 +1571,7 @@ TODO: WINDOWS ISSUES
 	};
 
 	var p = LoadQueue.prototype = new createjs.AbstractLoader();
+	LoadQueue.prototype.constructor = LoadQueue;
 	var s = LoadQueue;
 
 	/**
@@ -1745,8 +1776,30 @@ TODO: WINDOWS ISSUES
 
 	/**
 	 * Ensure loaded scripts "complete" in the order they are specified. Loaded scripts are added to the document head
-	 * once they are loaded. Note that scripts loaded via tags will load one-at-a-time when this property is `true`.
-	 * load one at a time
+	 * once they are loaded. Scripts loaded via tags will load one-at-a-time when this property is `true`, whereas
+	 * scripts loaded using XHR can load in any order, but will "finish" and be added to the document in the order
+	 * specified.
+	 *
+	 * Any items can be set to load in order by setting the `maintainOrder` property on the load item, or by ensuring
+	 * that only one connection can be open at a time using {{#crossLink "LoadQueue/setMaxConnections"}}{{/crossLink}}.
+	 * Note that when the `maintainScriptOrder` property is set to `true`, scripts items are automatically set to
+	 * `maintainOrder=true`, and changing the `maintainScriptOrder` to `false` during a load will not change items
+	 * already in a queue.
+	 *
+	 * <h4>Example</h4>
+	 *
+	 *      var queue = new createjs.LoadQueue();
+	 *      queue.setMaxConnections(3); // Set a higher number to load multiple items at once
+	 *      queue.maintainScriptOrder = true; // Ensure scripts are loaded in order
+	 *      queue.loadManifest([
+	 *          "script1.js",
+	 *          "script2.js",
+	 *          "image.png", // Load any time
+	 *          {src: "image2.png", maintainOrder: true} // Will wait for script2.js
+	 *          "image3.png",
+	 *          "script3.js" // Will wait for image2.png before loading (or completing when loading with XHR)
+	 *      ]);
+	 *
 	 * @property maintainScriptOrder
 	 * @type {Boolean}
 	 * @default true
@@ -2056,7 +2109,7 @@ TODO: WINDOWS ISSUES
 			for (var n in this._loadItemsById) {
 				this._disposeItem(this._loadItemsById[n]);
 			}
-			this.init(this.useXHR);
+			this.init(this.useXHR, this._basePath, this._crossOrigin);
 
 		// Remove specific items
 		} else {
@@ -2247,6 +2300,11 @@ TODO: WINDOWS ISSUES
 	 *         of types using the extension. Supported types are defined on LoadQueue, such as <code>LoadQueue.IMAGE</code>.
 	 *         It is recommended that a type is specified when a non-standard file URI (such as a php script) us used.</li>
      *         <li>id: A string identifier which can be used to reference the loaded object.</li>
+	 *         <li>maintainOrder: Set to `true` to ensure this asset loads in the order defined in the manifest. This
+	 *         will happen when the max connections has been set above 1 (using {{#crossLink "LoadQueue/setMaxConnections"}}{{/crossLink}}),
+	 *         and will only affect other assets also defined as `maintainOrder`. Everything else will finish as it is
+	 *         loaded. Ordered items are combined with script tags loading in order when {{#crossLink "LoadQueue/maintainScriptOrder:property"}}{{/crossLink}}
+	 *         is set to `true`.</li>
 	 *         <li>callback: Optional, used for JSONP requests, to define what method to call when the JSONP is loaded.</li>
      *         <li>data: An arbitrary data object, which is included with the loaded object</li>
 	 *         <li>method: used to define if this request uses GET or POST when sending data to the server. The default
@@ -2314,9 +2372,14 @@ TODO: WINDOWS ISSUES
 	 *         <li>src: The source of the file that is being loaded. This property is <b>required</b>. The source can
 	 *         either be a string (recommended), or an HTML tag.</li>
 	 *         <li>type: The type of file that will be loaded (image, sound, json, etc). PreloadJS does auto-detection
-	 *         of types using the extension. Supported types are defined on LoadQueue, such as <code>LoadQueue.IMAGE</code>.
+	 *         of types using the extension. Supported types are defined on LoadQueue, such as {{#crossLink "LoadQueue/IMAGE:property"}}{{/crossLink}}.
 	 *         It is recommended that a type is specified when a non-standard file URI (such as a php script) us used.</li>
 	 *         <li>id: A string identifier which can be used to reference the loaded object.</li>
+	 *         <li>maintainOrder: Set to `true` to ensure this asset loads in the order defined in the manifest. This
+	 *         will happen when the max connections has been set above 1 (using {{#crossLink "LoadQueue/setMaxConnections"}}{{/crossLink}}),
+	 *         and will only affect other assets also defined as `maintainOrder`. Everything else will finish as it is
+	 *         loaded. Ordered items are combined with script tags loading in order when {{#crossLink "LoadQueue/maintainScriptOrder:property"}}{{/crossLink}}
+	 *         is set to `true`.</li>
 	 *         <li>callback: Optional, used for JSONP requests, to define what method to call when the JSONP is loaded.</li>
 	 *         <li>data: An arbitrary data object, which is included with the loaded object</li>
 	 *         <li>method: used to define if this request uses GET or POST when sending data to the server. The default
@@ -2499,6 +2562,7 @@ TODO: WINDOWS ISSUES
 		if (item == null) { return; } // Sometimes plugins or types should be skipped.
 		var loader = this._createLoader(item);
 		if (loader != null) {
+			item._loader = loader;
 			this._loadQueue.push(loader);
 			this._loadQueueBackup.push(loader);
 
@@ -2506,9 +2570,11 @@ TODO: WINDOWS ISSUES
 			this._updateProgress();
 
 			// Only worry about script order when using XHR to load scripts. Tags are only loading one at a time.
-			if (this.maintainScriptOrder
+			if ((this.maintainScriptOrder
 					&& item.type == createjs.LoadQueue.JAVASCRIPT
-					&& loader instanceof createjs.XHRLoader) {
+					//&& loader instanceof createjs.XHRLoader //NOTE: Have to track all JS files this way
+					)
+					|| item.maintainOrder === true) {
 				this._scriptOrder.push(item);
 				this._loadedScripts.push(null);
 			}
@@ -2558,7 +2624,7 @@ TODO: WINDOWS ISSUES
 
 		// Determine Extension, etc.
 		var match = this._parseURI(item.src);
-		if (match != null) { item.ext = match[6]; }
+		if (match.extension) { item.ext = match.extension; }
 		if (item.type == null) {
 			item.type = this._getTypeByExtension(item.ext);
 		}
@@ -2567,13 +2633,13 @@ TODO: WINDOWS ISSUES
 		var bp = ""; // Store the generated basePath
 		var useBasePath = basePath || this._basePath;
 		var autoId = item.src;
-		if (match && match[1] == null && match[3] == null) {
+		if (!match.absolute && !match.relative) {
 			if (path) {
 				bp = path;
-				var pathMatch = this._parsePath(path);
+				var pathMatch = this._parseURI(path);
 				autoId = path + autoId;
 				// Also append basePath
-				if (useBasePath != null && pathMatch && pathMatch[1] == null && pathMatch[2] == null) {
+				if (useBasePath != null && !pathMatch.absolute && !pathMatch.relative) {
 					bp = useBasePath + bp;
 				}
 			} else if (useBasePath != null) {
@@ -2631,8 +2697,8 @@ TODO: WINDOWS ISSUES
 
 				// Update the extension in case the type changed:
 				match = this._parseURI(item.src);
-				if (match != null && match[6] != null) {
-					item.ext = match[6].toLowerCase();
+				if (match.extension != null) {
+					item.ext = match.extension;
 				}
 			}
 		}
@@ -2717,13 +2783,9 @@ TODO: WINDOWS ISSUES
 			if (this._currentLoads.length >= this._maxConnections) { break; }
 			var loader = this._loadQueue[i];
 
-			// Determine if we should be only loading one at a time:
-			if (this.maintainScriptOrder
-					&& loader instanceof createjs.TagLoader
-					&& loader.getItem().type == createjs.LoadQueue.JAVASCRIPT) {
-				if (this._currentlyLoadingScript) { continue; } // Later items in the queue might not be scripts.
-				this._currentlyLoadingScript = true;
-			}
+			// Determine if we should be only loading one tag-script at a time:
+			// Note: maintainOrder items don't do anything here because we can hold onto their loaded value
+			if (!this._canStartLoad(loader)) { continue; }
 			this._loadQueue.splice(i, 1);
   			i--;
             this._loadItem(loader);
@@ -2755,6 +2817,8 @@ TODO: WINDOWS ISSUES
 	p._handleFileError = function(event) {
 		var loader = event.target;
 		this._numItemsLoaded++;
+
+		this._finishOrderedItem(loader, true);
 		this._updateProgress();
 
 		var newEvent = new createjs.Event("error");
@@ -2787,47 +2851,43 @@ TODO: WINDOWS ISSUES
 			this._loadedRawResults[item.id] = loader.getResult(true);
 		}
 
+		// Clean up the load item
 		this._removeLoadItem(loader);
 
-		// Ensure that script loading happens in the right order.
-		if (this.maintainScriptOrder && item.type == createjs.LoadQueue.JAVASCRIPT) {
-			if (loader instanceof createjs.TagLoader) {
-				this._currentlyLoadingScript = false;
-			} else {
-				this._loadedScripts[createjs.indexOf(this._scriptOrder, item)] = item;
-				this._checkScriptLoadOrder(loader);
-				return;
-			}
+		if (!this._finishOrderedItem(loader)) {
+			// The item was NOT managed, so process it now
+			this._processFinishedLoad(item, loader);
 		}
-
-		// Clean up the load item
-		delete item._loadAsJSONP;
-
-		// If the item was a manifest, then
-		if (item.type == createjs.LoadQueue.MANIFEST) {
-			var result = loader.getResult();
-			if (result != null && result.manifest !== undefined) {
-				this.loadManifest(result, true);
-			}
-		}
-
-		this._processFinishedLoad(item, loader);
 	};
 
 	/**
-	 * @method _processFinishedLoad
-	 * @param {Object} item
+	 * Flag an item as finished. If the item's order is being managed, then set it up to finish
+	 * @method _finishOrderedItem
 	 * @param {AbstractLoader} loader
-	 * @protected
+	 * @return {Boolean} If the item's order is being managed. This allows the caller to take an alternate
+	 * behaviour if it is.
+	 * @private
 	 */
-	p._processFinishedLoad = function(item, loader) {
-		// Old handleFileTagComplete follows here.
-		this._numItemsLoaded++;
+	p._finishOrderedItem = function(loader, loadFailed) {
+		var item = loader.getItem();
 
-		this._updateProgress();
-		this._sendFileComplete(item, loader);
+		if ((this.maintainScriptOrder && item.type == createjs.LoadQueue.JAVASCRIPT)
+				|| item.maintainOrder) {
 
-		this._loadNext();
+			//TODO: Evaluate removal of the _currentlyLoadingScript
+			if (loader instanceof createjs.TagLoader && item.type == createjs.LoadQueue.JAVASCRIPT) {
+				this._currentlyLoadingScript = false;
+			}
+
+			var index = createjs.indexOf(this._scriptOrder, item);
+			if (index == -1) { return false; } // This loader no longer exists
+			this._loadedScripts[index] = (loadFailed === true) ? true : item;
+
+			this._checkScriptLoadOrder();
+			return true;
+		}
+
+		return false;
 	};
 
 	/**
@@ -2845,15 +2905,66 @@ TODO: WINDOWS ISSUES
 		for (var i=0;i<l;i++) {
 			var item = this._loadedScripts[i];
 			if (item === null) { break; } // This is still loading. Do not process further.
-			if (item === true) { continue; } // This has completed, and been processed. Move on.
+ 			if (item === true) { continue; } // This has completed, and been processed. Move on.
 
-			// Append script tags to the head automatically. Tags do this in the loader, but XHR scripts have to maintain order.
 			var loadItem = this._loadedResults[item.id];
-			(document.body || document.getElementsByTagName("body")[0]).appendChild(loadItem);
+			if (item.type == createjs.LoadQueue.JAVASCRIPT) {
+				// Append script tags to the head automatically. Tags do this in the loader, but XHR scripts have to maintain order.
+				(document.body || document.getElementsByTagName("body")[0]).appendChild(loadItem);
+			}
 
-			this._processFinishedLoad(item);
+			var loader = item._loader;
+			this._processFinishedLoad(item, loader);
 			this._loadedScripts[i] = true;
 		}
+	};
+
+	/**
+	 * @method _processFinishedLoad
+	 * @param {Object} item
+	 * @param {AbstractLoader} loader
+	 * @protected
+	 */
+	p._processFinishedLoad = function(item, loader) {
+		// If the item was a manifest, then queue it up!
+		if (item.type == createjs.LoadQueue.MANIFEST) {
+			var result = loader.getResult();
+			if (result != null && result.manifest !== undefined) {
+				this.loadManifest(result, true);
+			}
+		}
+
+		this._numItemsLoaded++;
+		this._updateProgress();
+		this._sendFileComplete(item, loader);
+
+		this._loadNext();
+	};
+
+	/**
+	 * Ensure items with `maintainOrder=true` that are before the specified item have loaded. This only applies to
+	 * JavaScript items that are being loaded with a TagLoader, since they have to be loaded and completed <strong>before</strong>
+	 * the script can even be started, since it exist in the DOM while loading.
+	 * @method _canStartLoad
+	 * @param {XHRLoader|TagLoader} loader The loader for the item
+	 * @return {Boolean} Whether the item can start a load or not.
+	 * @private
+	 */
+	p._canStartLoad = function(loader) {
+		if (!this.maintainScriptOrder || loader instanceof createjs.XHRLoader) { return true; }
+		var item = loader.getItem();
+		if (item.type != createjs.LoadQueue.JAVASCRIPT) { return true; }
+		if (this._currentlyLoadingScript) { return false; }
+
+		var index = this._scriptOrder.indexOf(item);
+		var i = 0;
+		while (i < index) {
+			var checkItem = this._loadedScripts[i];
+			if (checkItem == null) { return false; }
+			i++;
+		}
+		this._currentlyLoadingScript = true;
+		return true;
 	};
 
 	/**
@@ -2863,6 +2974,10 @@ TODO: WINDOWS ISSUES
 	 * @private
 	 */
 	p._removeLoadItem = function(loader) {
+		var item = loader.getItem();
+		delete item._loader;
+		delete item._loadAsJSONP;
+
 		var l = this._currentLoads.length;
 		for (var i=0;i<l;i++) {
 			if (this._currentLoads[i] == loader) {
@@ -3058,7 +3173,7 @@ TODO: WINDOWS ISSUES
             item.completeHandler(event);
         }
 
-		this.hasEventListener("fileload") && this.dispatchEvent(event)
+		this.hasEventListener("fileload") && this.dispatchEvent(event);
 	};
 
 	/**
@@ -3168,6 +3283,7 @@ this.createjs = this.createjs||{};
 	};
 
 	var p = TagLoader.prototype = new createjs.AbstractLoader();
+	TagLoader.prototype.constructor = TagLoader;
 
 // Protected
 
@@ -3312,13 +3428,29 @@ this.createjs = this.createjs||{};
 			item.type == createjs.LoadQueue.CSS) {
 				this._startTagVisibility = tag.style.visibility;
 				tag.style.visibility = "hidden";
-				(document.body || document.getElementsByTagName("body")[0]).appendChild(tag);
+				var node = document.body || document.getElementsByTagName("body")[0];
+				if (node == null) {
+					if (item.type == createjs.LoadQueue.SVG) {
+						this._handleSVGError();
+						return;
+					} else {
+						node = document.head || document.getElementsByTagName("head");
+					}
+				}
+				node.appendChild(tag);
 		}
 
 		// Note: Previous versions didn't seem to work when we called load() for OGG tags in Firefox. Seems fixed in 15.0.1
 		if (tag.load != null) {
 			tag.load();
 		}
+	};
+
+	p._handleSVGError = function() {
+		this._clean();
+		var event = new createjs.Event("error");
+		event.text = "SVG_NO_BODY";
+		this._sendError(event);
 	};
 
 	p._handleJSONPLoad = function(data) {
@@ -3404,8 +3536,8 @@ this.createjs = this.createjs||{};
 				// case createjs.LoadQueue.CSS:
 				//LM: We may need to remove CSS tags loaded using a LINK
 				tag.style.visibility = this._startTagVisibility;
-				(document.body || document.getElementsByTagName("body")[0]).removeChild(tag);
-			break;
+				tag.parentNode && tag.parentNode.contains(tag) && tag.parentNode.removeChild(tag);
+				break;
 			default:
 		}
 
@@ -3534,6 +3666,7 @@ this.createjs = this.createjs || {};
 	];
 
 	var p = XHRLoader.prototype = new createjs.AbstractLoader();
+	XHRLoader.prototype.constructor = XHRLoader;
 
 	//Protected
 	/**

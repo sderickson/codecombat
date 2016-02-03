@@ -4,13 +4,12 @@ block content
 
   div.contribute_class
 
-    include /templates/contribute/contribute_nav
+    .class_detail
+
+      img(src="/images/pages/contribute/class_detail_scribe.png", alt="")
 
     div.class-main#scribe-main
       
-      .class_image
-          img.img-responsive(src="/images/pages/contribute/scribe.png", alt="")
-
       h2
         span(data-i18n="classes.scribe_title") Scribe
         span  
@@ -37,44 +36,19 @@ block content
       
       h4(data-i18n="contribute.how_to_join") How To Join
       p
-        a(title='Contact', tabindex=-1, data-toggle="coco-modal", data-target="modal/contact", data-i18n="contribute.contact_us_url")
+        a(tabindex=-1, data-toggle="coco-modal", data-target="core/ContactModal", data-i18n="contribute.contact_us_url")
           | Contact us
         span , 
         span(data-i18n="contribute.scribe_join_description")
           | tell us a little about yourself, your experience with programming and
           | what sort of things you'd like to write about. We'll go from there!
 
-      if me.attributes.anonymous
-        div#sign-up.alert.alert-info
-          strong(data-i18n="contribute.alert_account_message_intro")
-            | Hey there!
-          span  
-          span(data-i18n="contribute.alert_account_message_pref") 
-            | To subscribe for class emails, you'll need to 
-          a(data-toggle="coco-modal", data-target="modal/signup", data-i18n="contribute.alert_account_message_create_url")
-            | create an account
-          span  
-          span(data-i18n="contribute.alert_account_message_suf")
-            | first.
+      .contributor-signup-anonymous
+      .contributor-signup(data-contributor-class-id="article_editor", data-contributor-class-name="scribe")
 
-      label.checkbox(for="article_editor").well
-        input(type='checkbox', name="article_editor", id="article_editor")
-        span(data-i18n="contribute.scribe_subscribe_desc")
-          | Get emails about article writing announcements.
-        .saved-notification  ✓ Saved
-
-      #Contributors
-        h3(data-i18n="contribute.diligent_scribes")
-          | Our Diligent Scribes:
-        ul.scribes
-          li Ryan Faidley
-          li Glen De Cauwsemaecker
-          li Mischa Lewis-Norelle
-          li Tavio
-          li Ronnie Cheng
-          li engstrom
-          li Dman19993
-          li mattinsler
-          
+      h3(data-i18n="contribute.diligent_scribes")
+        | Our Diligent Scribes:
+      
+      #contributor-list(data-contributor-class-name="scribe")
 
     div.clearfix

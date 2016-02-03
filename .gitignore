@@ -28,9 +28,15 @@ Thumbs.db
 *.sublime-project
 *.sublime-workspace
 
+# IntelliJ/WebStorm
+*.iml
+
 # NPM packages folder.
 node_modules/
 bower_components/
+
+# Vagrant
+.vagrant/
 
 # Some other random stuff
 always-ignore extensions
@@ -41,6 +47,7 @@ always-ignore extensions
 *.rej
 *.vi
 *.sass-cache
+.zedstate
 
 # OS or Editor folders
 .cache
@@ -70,11 +77,24 @@ coverage/
 FLOOBITS_README.md
 
 # mongodb
-db/
 bin/node/
 bin/mongo/
 
 # windows
 /SCOCODE.bat
+cocodb/
 
+# local settings
+login.coffee
+
+# debugging
+*.heapsnapshot
+
+npm-debug.log*
+
+temp/
+Dockerfile
 ### If you add something here, copy it to the end of .npmignore, too. ###
+
+# Visual Studio Code
+.vscode/
